@@ -5,11 +5,15 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
+
+	"github.com/mrasore98/pokedexcli/internal/pokecache"
 )
 
 func main() {
 	const prompt string = "Pokedex > "
-	cmdRegistry := commandRegistry()
+	cache := pokecache.NewCache(30 * time.Second)
+	cmdRegistry := commandRegistry(cache)
 	configRegistry := configRegistry()
 
 	scanner := bufio.NewScanner(os.Stdin)

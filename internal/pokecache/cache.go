@@ -17,7 +17,10 @@ type Cache struct {
 }
 
 func NewCache(interval time.Duration) *Cache {
-	cache := Cache{reapInterval: interval}
+	cache := Cache{
+		reapInterval: interval,
+		entries:      make(map[string]cacheEntry),
+	}
 	go cache.reapLoop()
 	return &cache
 }
@@ -42,6 +45,7 @@ func (c *Cache) Get(key string) ([]byte, bool) {
 }
 
 func (c *Cache) reapLoop() {
+	ticker := time.NewTicker(c.reapInterval)
 	for {
 		c.lock.Lock()
 
@@ -51,6 +55,7 @@ func (c *Cache) reapLoop() {
 			}
 		}
 		c.lock.Unlock()
-		time.Sleep(c.reapInterval)
+		// TODO: Use a `done` channel with a select statement
+		<-ticker.C
 	}
 }

@@ -3,9 +3,14 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+
+	"github.com/mrasore98/pokedexcli/internal/pokecache"
 )
+
+var cache *pokecache.Cache
 
 type responseModel struct {
 	Next     string              `json:"next"`
@@ -24,7 +29,9 @@ type cliCommand struct {
 	callback    func(*apiNav) error
 }
 
-func commandRegistry() map[string]cliCommand {
+func commandRegistry(cmdCache *pokecache.Cache) map[string]cliCommand {
+	// Update the cache which will be used by commands
+	cache = cmdCache
 	registeredCommands := map[string]cliCommand{
 		"exit": {
 			name:        "exit",
@@ -131,17 +138,31 @@ func commandMapB(config *apiNav) error {
 }
 
 func getMapAreas(url string) (responseModel, error) {
-	res, err := http.Get(url)
-	if err != nil {
-		return responseModel{}, fmt.Errorf("could not get map areas: %w", err)
-	}
-	defer res.Body.Close()
-
+	var resBytes []byte
+	var ok bool
 	decResp := responseModel{}
-	decoder := json.NewDecoder(res.Body)
-	err = decoder.Decode(&decResp)
+
+	// First check for response in cache
+	if resBytes, ok = cache.Get(url); !ok {
+		// If not in cache, make Http request
+		res, err := http.Get(url)
+		if err != nil {
+			return responseModel{}, fmt.Errorf("could not get map areas: %w", err)
+		}
+		defer res.Body.Close()
+		if resBytes, err = io.ReadAll(res.Body); err != nil {
+			return responseModel{}, err
+		}
+		// Add Http response to cache
+		cache.Add(url, resBytes)
+	} else {
+		fmt.Println("Used cache!!")
+	}
+
+	err := json.Unmarshal(resBytes, &decResp)
 	if err != nil {
 		return responseModel{}, fmt.Errorf("could not decode response: %w", err)
+		return responseModel{}, nil
 	}
 	return decResp, nil
 }
