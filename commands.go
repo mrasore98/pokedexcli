@@ -105,7 +105,7 @@ func commandHelp(cmdRegistry map[string]cliCommand) func(*apiNav) error {
 
 func commandMap(config *apiNav) error {
 	url := config.Next
-	decResp, err := getMapAreas(url)
+	decResp, err := makeApiRequest(url)
 	if err != nil {
 		return err
 	}
@@ -124,7 +124,7 @@ func commandMapB(config *apiNav) error {
 		fmt.Println("you're on the first page")
 		return nil
 	}
-	decResp, err := getMapAreas(url)
+	decResp, err := makeApiRequest(url)
 	if err != nil {
 		return err
 	}
@@ -137,7 +137,7 @@ func commandMapB(config *apiNav) error {
 	return nil
 }
 
-func getMapAreas(url string) (responseModel, error) {
+func makeApiRequest(url string) (responseModel, error) {
 	var resBytes []byte
 	var ok bool
 	decResp := responseModel{}
@@ -147,7 +147,7 @@ func getMapAreas(url string) (responseModel, error) {
 		// If not in cache, make Http request
 		res, err := http.Get(url)
 		if err != nil {
-			return responseModel{}, fmt.Errorf("could not get map areas: %w", err)
+			return responseModel{}, fmt.Errorf("could not get requested endpoint: %w", err)
 		}
 		defer res.Body.Close()
 		if resBytes, err = io.ReadAll(res.Body); err != nil {
