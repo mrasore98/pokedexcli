@@ -27,7 +27,14 @@ func main() {
 		input := scanner.Text()
 		clean := cleanInput(input)
 		cmd := clean[0]
-		runCommand(cmd, cmdRegistry, configRegistry)
+		var params []string = nil
+		if len(clean) > 1 {
+			params = clean[1:]
+		}
+		if err := runCommand(cmdRegistry, configRegistry, cmd, params); err != nil {
+			fmt.Println(err)
+			// os.Exit(1)
+		}
 	}
 }
 
