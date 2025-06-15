@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"os"
 
@@ -12,6 +13,8 @@ import (
 )
 
 var cache *pokecache.Cache
+
+var pokedex = make(map[string]responses.PokemonResponse)
 
 type apiNav struct {
 	Next     string `json:"next"`
@@ -48,6 +51,21 @@ func commandRegistry(cmdCache *pokecache.Cache) map[string]cliCommand {
 			description: "Explore the area for pokemon. (Provide area name as argument).",
 			callback:    commandExplore,
 		},
+		"catch": {
+			name:        "catch",
+			description: "Attempt to catch a pokemon. (Provide pokemon name as argument).",
+			callback:    commandCatch,
+		},
+		"inspect": {
+			name:        "inspect",
+			description: "Get details for captured pokemon from your Pokedex. (Provide pokemon name as argument).",
+			callback:    commandInspect,
+		},
+		"pokedex": {
+			name:        "pokedex",
+			description: "List Pokemon you've caught.",
+			callback:    commandPokedex,
+		},
 	}
 
 	// Add help command after so it can reference command registry
@@ -70,6 +88,11 @@ func configRegistry() map[string]*apiNav {
 		"explore": {
 			Next: "https://pokeapi.co/api/v2/location-area",
 		},
+		"catch": {
+			Next: "https://pokeapi.co/api/v2/pokemon",
+		},
+		"inspect": {},
+		"pokedex": {},
 	}
 
 	// Use the same pointer for the forward and backward map commands
@@ -155,6 +178,64 @@ func commandExplore(conf *apiNav, params []string) error {
 	return nil
 }
 
+func commandCatch(conf *apiNav, params []string) error {
+	if len(params) < 1 {
+		return fmt.Errorf("must provide name of pokemon")
+	}
+	pokemonName := params[0]
+	url := conf.Next + "/" + pokemonName
+	resp, err := makeApiRequest(url, responses.PokemonResponse{})
+	if err != nil {
+		return err
+	}
+	// TODO: add random chance of catching based on BaseExperience
+	// If random in (0, 1) < 1 / (BaseExperience / 10) then catch?
+	fmt.Printf("Throwing a Pokeball at %v...\n", pokemonName)
+	if chance := 500 * rand.Float32(); 1.0/chance < 1.0/float32(resp.BaseExperience) {
+		fmt.Printf("You caught %v!\n", pokemonName)
+		pokedex[pokemonName] = resp
+	} else {
+		fmt.Printf("Didn't catch %v this time. Try again!\n", pokemonName)
+		// fmt.Println("Chance", chance)
+		// fmt.Println("Calc: ", 1.0/chance, "Base: ", 1.0/float32(resp.BaseExperience))
+	}
+
+	return nil
+}
+
+func commandInspect(conf *apiNav, params []string) error {
+	if len(params) < 1 {
+		return fmt.Errorf("must provide name of pokemon")
+	}
+
+	pokemon, ok := pokedex[params[0]]
+	if !ok {
+		fmt.Println("You have not caught that pokemon")
+		return nil
+	}
+
+	fmt.Println("Name:", pokemon.Name)
+	fmt.Println("Height", pokemon.Height)
+	fmt.Println("Weight", pokemon.Weight)
+	fmt.Println("Stats:")
+	for _, stat := range pokemon.Stats {
+		fmt.Printf("\t-%v: %v\n", stat.Stat.Name, stat.BaseStat)
+	}
+	fmt.Println("Types:")
+	for _, type_ := range pokemon.Types {
+		fmt.Printf("\t-%v\n", type_.Type.Name)
+	}
+	return nil
+}
+
+func commandPokedex(_ *apiNav, _ []string) error {
+	fmt.Println("Your Pokedex:")
+	for name := range pokedex {
+		fmt.Printf("\t-%v\n", name)
+	}
+	return nil
+}
+
 func makeApiRequest[T any](url string, model T) (T, error) {
 	var resBytes []byte
 	var ok bool
@@ -174,7 +255,7 @@ func makeApiRequest[T any](url string, model T) (T, error) {
 		// Add Http response to cache
 		cache.Add(url, resBytes)
 	} else {
-		fmt.Println("Used cache!!")
+		// fmt.Println("Used cache!!")
 	}
 
 	err := json.Unmarshal(resBytes, &model)
